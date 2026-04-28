@@ -1,0 +1,11 @@
+__pycache__/
+.venv/
+*.pyc
+*.pyo
+*.pyd
+*거래명세서*
+*견적서*
+build/
+dist/*.exe
+output/SpringCalculator.exe
+SpringCalculator.exe

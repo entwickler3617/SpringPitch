@@ -1,0 +1,468 @@
+* 프로젝트 폴더의 다음 파일들을 면밀히 분석하고 이해하여 
+현재 구현된 파이썬 프로그램을 문서들의 내용에 맞게 수정한다.
+(prompt_v0.8.txt, 역설계 프로그램 개발 사양서_251017.pdf, TK1_FRT_zero-1_251014.igs, 결과보고서양식.png, process1.png,process2.png,process3.png)
+
+* 프롬프트처리중 불일치하거나 불명확하거나 모호한 부분, 이해분석 그리고 
+결정이 필요한 부분은 별도 정리하여 표시한다.
+
+
+* 프로그램작성 가이드 파일명: 역설계 프로그램 개발 사양서_251017.pdf
+* 입력데이타 파일명: TK1_FRT_zero-1_251014.igs
+  - 실측데이타로 데이타 갯수,구성,값 등은 랜덤하게 차이가 있을 수 있음.
+* 출력데이타 파일명: TK1.xlsx엑셀파일의 zero-1시트와 별도 결과보고서
+  - xyz 좌표계를 rθz 좌표계로 변환하고 다음 데이타를 계산하여 산출한다.
+  ( x,y,z,x_norm,y_norm,z_norm,r,θ,z 에서  
+  Turn,Radius,Diameter(Perpendicular),Diameter(Vectorial),Height,Pitch,min_pitch)
+
+* 프로그램 프로세스
+1. 스프링을 스캐닝후 스프링단면의 중심점을 추출하여 igs파일로저장(TK1_FRT_zero-1_251014.igs)
+- igs 파일의 총 라인은 측정결과에 따라 가변
+- igs 파일의 정보를 읽어서 분석
+- xyz 좌표계 중심은 igs 파일의 데이타로부터 도출가능
+- rθz 좌표계 중심은 스프링 시작점의 중앙.(시작점과 종료점의 구분은 반경(r)이 작은 쪽을 시작점으로 설정)
+ 
+- Igs 파일포맷(형식)의 분석(시작점과 종료점의 구분)
+- 나선형 포인트데이터를 곡률기준으로 보정
+- 점데이터 표준화(Normalization)
+- 직교좌표계를 원통형좌표계로 변환(xyz -> rθz)
+- 계산결과 산출
+
+2. 보정직교좌표와 원통좌표기준점의 선정방법  
+- 원시 점데이터(igs)에서 나선형 곡률이 스무스하게 구성되도록 양끝 주변점(Point)들을 찾아서 위치보정한다.
+ (일부 튀는 양끝 주변점 데이터들만 보정)
+- 원시 점데이터(igs)에서 나선형 곡률이 스무스하게 구성되도록 중간 점(Point)들 위치보정한다.
+ (일부 튀는 중간데이터들만 보정)
+- 기준좌표의 선정은 원통형 양단중 지름(r*2)값이 최소인 면을 기준으로 좌표계기준의 시작점으로 선정한다.
+- 직교좌표과 원통좌표는 동일한 원점으로 일치시킨다.  
+- 좌표계기준점 선정: 기준점에서 보정시작점, 기준점에서 선데이터를 따라서 거의 혹은 완벽히 수평으로 (180도)되는 위치점
+ (해당 포인트데이터가 없는 경우 보간법을 이용해서 가상의 위치점 선정)까지 반지름 길이가 동일한 중심점
+- 보정된 시작점과 종료점기준으로 1,000개의 등간격 표준데이터로 위치변환 
+ (전체적인 나선구조topology가 변하지 않는 단순 데이터Normalization)
+
+* 보간법 적용규칙: 해당 위치에 점(포인트) 데이터가 없는 경우 인접한 2점의 위치정보로 보간하여
+  가상의 점(포인트) 위치 데이터로 산출
+
+ 
+
+3. 좌표변환
+-xyz 좌표계를 rθz 좌표계로 변환하고 다음 데이타를 계산하여 산출한다.
+  ( x,y,z,r,θ,z 에서  
+  Turn,Radius,Diameter(Perpendicular),Diameter(Vectorial),Height,Pitch,min_pitch)
+  
+4. rθz 좌표변환 테이블로부터 구한 좌표성분을 이용하여 스프링의 치수(거리개념)을 계산할수있음.
+- 앞서 스프링의 중심선을 1000개로 등분한 포인트데이터를 기반으로 외경이나 피치 등을 추출가능
+- 그러나, 1000개 데이터가 정확한 위치가 아닌경우 Interpolation적용하여 계산
+
+5. 좌표변환 결과로부터 치수추출
+- 기본적으로 TK1.xlsx엑셀파일 std시트의 L열~X열에 적용된 Cell계산식을 분석하여 파이썬으로 별도 계산식(함수) 구현하고,
+- zero-1시트의 L열~X열에 계산 결과값들을 입력업데이트
+- rθz 좌표계에서 1,000개로 등분한 데이터를 기반으로 외경이나 피치 등을 추출가능
+- 그러나, 1,000개 데이터가 정확한 위치를 포함하고 있지않으므로 Interpolation이 필요함
+- 단순히 평균개념을 쓰기보다는 3개의 점을 이용한 호(arc)에서 추출(3개의 점은 공간상의 점으로 주의)
+- rθz 좌표계로 부터 치수추출시 인접포인트사이의 보간법(Interpolation)을 적용하여 치수계산 산출
+ 
+6. 치수산출결과 보고서작성
+- 치수계산 결과는 결과보고서양식.png 이미지를 참고하여 별도 보고서파일 작성
+- 치수계산 수식은 std시트의 Z3:AC14영역에 적용된 Cell계산식을 분석참조하여 파이썬으로 별도 계산식(함수) 구현하여
+  zero-1시트의 Z3:AC14영역에 값을 저장
+
+
+7. 작성기준 공통
+- igs 데이터(파일) : 스프링을 스캐닝 후 스프링 단면의 중심점을 추출하여 저장된 원시 데이터(파일) 
+- 좌표계기준점 : 직교좌표계와 원통좌표계의 기준이 되는 원점
+- 표준화(Normalization): 불규칙한 실측데이터를 시작점과 종료점간의 1,000개의 등간격 포인트(점)의 데이터로 변환
+    Uniform B-Spline/None-Uniform Rotation B-Spline (NURBS)
+- θ 기준방향: 시작점(0도 방향)에서 종료점으로 위치데이터를 따라서 회전하는 방향(-180~+180)으로 값설정
+- 기본길이 단위는 mm (회전수,권수 등 제외)
+
+
+- 치수계산 결과는 결과보고서양식.png 이미지를 참고하여 별도 보고서파일 작성
+- 치수계산 수식은 
+  std시트의 Z3:AC14영역에 적용된 Cell계산식을 분석참조하여 
+  zero-1시트의 Z3:AC14 동일영역에 동일셀 계산값을 
+  파이썬으로 구현하도록 수정한다. 
+  현재 각 셀의 위치와 값이 변경됨.
+  
+ zero-1시트의 E:G열 점포인트(x_norm,y_norm,z_norm) 계산값이 제대로 산출되지 않은 원인을 분석하고 수정하시오. 
+ -E:G열의 1행은 헤더임.
+
+다음 답변에 따라서 프로그램을 수정변경하고,
+추가 결정이나 설명이 필요한 부분을 도출하시오.
+
+0. 산출작업시트로 오로지 zero-1시트만 사용하면 다른시트는 수정하거나 편집해서는 안된다.(중요)  
+1.1 표준화 대상 포인트 개수
+사양: “1,000개의 등간격 포인트”로 표준화 (Normalization)만 지원하며 zero-1시트의 (x_norm,y_norm,z_norm)열에 표시
+
+1.2 E,F,G(x_norm,y_norm,z_norm) 정의
+사양 명칭: x_norm,y_norm,z_norm (축 기준 표준화 좌표처럼 보임)
+사용자 요구: “E,F,G는 원시값과 동일, 이상치만 교정”, 
+답변: 이상치는 시작점부근과 종료점부근에서 물리적으로 나선형구조가 변형부분만 스무스한 곡선을 유지하도록 교정하고
+	전체적으로 나선형 구조에서 벗어난 일부 불규칙데이터만 보정하되 나머지 전체데이터를 왜곡해서는 안된다.
+
+1.4 Normalization 곡선 방식
+
+사양: “Uniform B-Spline / NURBS” 제시, 적용 순서·스무딩 정도 불명확.
+결정: 기존 곡선 방식을 삭제하고 원시데이터의 형상유지하는 곡선유지.
+답변: 원시데이터의 나선형(스프링) 형상구조의 곡선을 유지하고 보정부분을 제외하고는 데이터 수정 혹은 변경이 없어야 한다.
+
+1.5 곡률기준 보정
+사양: “나선형 포인트데이터를 곡률 기준으로 보정” → 어떤 곡률? 어느 범위?
+현재: Seam 회전(min_gap), complete_turn trimming, optional smoothing만 구현. 실질 “곡률 기반 재배치” 미구현.
+제안: 추가로 곡률(반경 변화율) 계산 후 이상치 구간 재보간 모듈 필요 (후속 작업 항목).	  
+    반드시 상기 1.4의 곡선 방식을 준수한다.
+답변: 추가설명이 필요.	
+
+
+2. 시작점 / 종료점 / 좌표계 원점
+2.1 시작점 선정 기준
+
+사양: “지름(r*2) 최소인 면” vs “반경이 작은 쪽” → 문구 동일 의미지만 다면성 (슬라이스 범위 vs 단일 점) 명시 X.
+결정: END_SLICE_PERCENT로 상·하단 슬라이스 추출 후 median radius 비교 → 작은 쪽을 시작.
+
+2.2 원점 방식
+사양: “직교좌표계와 원통좌표계 동일한 원점” + “180도 수평이 되는 위치점까지 반지름 동일한 중심”
+모호성: 180도 참조점 찾는 로직 및 ‘동일 반지름’ 조건 정량화 방법 미정.
+현재: 시작 슬라이스 대표점과 약 반대 위상(≈ π) 점의 중점 축 투영을 원점으로 사용.
+Gap: ‘반지름 동일’ 조건 검증 없음.
+제안: 개선 패스
+π 근처 후보들 중 radius 차 최소인 두 점 선택
+중점 축 투영 → 재귀 1~2회 반복 최소화.
+답변: coordinate.png 이미지 참조. 시작점에서 데이터 순서대로 회전방향 설정하여 산출.
+
+2.3 Opposite phase 찾기
+사양: 명시 없음 (우리 구현: unwrap θ 후 π 근접 인덱스).
+확인: 합리적이나 문서화 필요.
+답변: 추가설명이 필요.
+
+
+3. 각도(θ) 처리
+
+3.1 범위 설정
+사양: “−180~+180으로 값 설정”
+구현: I열 = wrapped degrees (−180..180), Turn 계산용 L열 = unwrapped degrees.
+모호성: Turn 증가형 필요 여부 문서 불명확.
+결정: L=unwrapped, I=wrapped; Turn=N=L/360.
+답변: I열 = wrapped degrees (−180..180) 맞음.
+    std시트 S열의 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 S열의 셀에 직접 값만 기록한다.
+    단, S열 산출은 먼저 R열의 값을 계산하여 참조한다. 
+
+3.2 시작점 θ=0
+사양: 시작점 = 0도 방향
+구현: unwrapped에서 시작 인덱스 기준 offset 제거.
+Gap: raw_preserve 모드에서 데이터 순서가 물리적 시작점과 다를 경우 오차.
+제안: start 인덱스 확정 후 raw 배열 순환(roll) 적용 옵션 제공 (SPRING_ALIGN_START=on).
+답변: coordinate.png 이미지 참조. 시작점에서 데이터 순서대로 회전방향 설정하여 산출.
+
+4. Cylindrical / 치수 계산
+4.1 Diameter(Vectorial)
+사양: 3점 호(arc) 이용 (공간상 점 주의) → plane 선택·3점간 거리·원 추정 명시 안됨.
+구현: arc_metrics.py (local_xy vs best_fit plane).
+Gap: 선택 로직, 품질 판단(신뢰도) 미보고.
+제안: 반환에 ‘valid_flag’, ‘residual’ 추가, 신뢰도 낮으면 perpendicular diameter fallback.
+답변: std시트 S열의 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 S열의 셀에 직접 값만 기록한다.
+    단, S열 산출은 먼저 R열의 값을 계산하여 참조한다. 
+
+4.2 Pitch 계산
+사양: 인접 포인트 사이 보간법(Interpolation) 적용 → 단순 평균 회피.
+구현: 차분 방식 + Excel formula (Z/TURN). Arc 기반 pitch refinement 일부 존재(초안).
+Gap: 어느 구간에서 arc 보정 피치를 적용할지 정책 부재.
+제안: pitch_arc_valid 마스크로 부분 대체 + smoothing 후 최소/평균 재산출.
+답변: std시트 W열의 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 W열의 셀에 직접 값만 기록한다.
+    단, W열 산출은 먼저 V열의 값을 계산하여 참조한다. 
+
+4.3 Height
+사양: z축 상대 거리 산출 (명확)
+구현: U열 수식 (Temp_U - $Temp_U$2). OK.
+답변: std시트 U열의 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 U열의 셀에 직접 값만 기록한다.
+
+4.4 min_pitch
+사양: 최소 피치 값 → 정의된 표본 처리(노이즈 필터링 여부) 불명확.
+구현: Excel MIN(W) (차분 기반 즉시 값).
+제안: 안정화: rolling median + 작은 구간(예 5%) 이상치 제거 후 재계산.
+답변: std시트 X열의 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 X열의 셀에 직접 값만 기록한다.
+
+5. Outlier / Smoothing
+
+5.1 “일부 튀는 양끝/중간 데이터 보정”
+사양: 어떤 기준치? 몇 %? 미정.
+구현: MAD 기반 radius & step 길이 threshold.
+Gap: 곡률 기반 보정 미구현, 끝단 별도 기준 없음.
+제안: 끝단(예: 첫/마지막 3%) 구간에 독립적 threshold (SPRING_OUTLIER_END_FACTOR) 추가.
+답변: 원시데이터를 그래프로 그리면 원통형의 나선구조로 유지해야 하며, 
+    전체적으로 나선구조 스프링에서 벗어난 데이터값을 보정.
+    따라서, 보정부분을 제외하고 원시데이터(x,y,z)의 데이터값이 변경 혹은 왜곡되어서는 안된다.
+	(보정예시. 시작단 혹은 끝단이 매끄럽지못하고 구부러진 경우/실제 제품은 비곡선형태/시작단.끝단이 짧은 경우)
+
+5.2 Smoothing 모드
+사양: 명확한 smoothing 요구 문구 없음, 단 ‘곡률 스무스’ 언급.
+구현: SMOOTH_MODE=none|robust_ends|robust_all (현재 pitch/r 단순 이동평균)
+Gap: 곡률 기반, adaptive window 없음.
+제안: curvature 계산 후 급격 변화 구간 window 확대.
+답변: 원시데이터를 그래프로 그리면 원통형의 나선구조로 유지해야 하며,
+    전체적으로 나선구조 스프링에서 벗어난 데이터값을 보정.
+    따라서, 보정부분을 제외하고 원시데이터(x,y,z)의 데이터값이 변경 혹은 왜곡되어서는 안된다.
+
+6. Excel 사양 대응
+
+6.1 L..X 열 매핑
+사양 이미지와 실제 workbook 정렬 필요.
+구현: Temp_* → formula mapping 완료.
+Gap: 일부 명칭( Temp_Q / Temp_S / Temp_U / Temp_W ) 표준 명세 문서화 필요.
+제안: README 또는 gap 문서에 열 정의 표 삽입.
+답변: 일부 명칭( Temp_Q / Temp_S / Temp_U / Temp_W )는 결과치 계산을 위한 중간 혹은 임시값으로 
+     어느 열(column)값산출을 위한 컬럼인지 식별만 가능하면 된다.
+
+6.2 Z3:AC14 셀
+사양: “std 시트 셀 계산식을 분석” vs 현재 zero-1 시트 직접 값만 기록.
+Gap: 원래 std 시트의 구체 수식 미이식—대상 값만 Python 계산 후 삽입.
+제안: 별도 함수로 각 셀 공식(예: 높이, 평균 피치, 최대/최소 지름, 권수 등) 재현 + value & formula 동시 기록 옵션.
+답변: std시트 Z3:AC14 셀 계산식을 분석하여 작업시트(zero-1)의 동일영역 Z3:AC14 셀에 직접 값만 기록한다.
+
+6.3 다중 시트 문제
+사양: std 시트 언급, 현재 zero-1 시트 사용.
+결정: 필요 시 ‘std’ 시트 추가 및 동일 Z3:AC14 공식/값 병렬 기록.
+답변: std시트는 기준데이터를 저장하므로 절대 수정되거나 변경되어서는 안된다.
+
+7. 보고서(결과보고서양식.png)
+7.1 포함 항목
+사양: 이미지 기반 (치수결과 + 환경/결정). 문서화된 정확 항목 목록 미정.
+구현: Markdown 기본 메트릭, 파라미터.
+Gap: arc 보정 신뢰도, outlier 요약, 선택된 시작·종료 인덱스, θ 모드 명시 부족.
+제안: report_generator 확장:
+메트릭: Height_total, Turn_total, Pitch_min, Pitch_mean, Diameter_perp_min/max, Diameter_vectorial_min/max, Outlier_count, Axis_vector, Origin.
+Params: 모든 SPRING_* env values.
+답변: 나중에 보완 예정.
+
+8. IGES 파서
+8.1 변환(124) / 단위
+사양: “igs 파일 정보를 읽고 분석” → 정확한 변환 행렬 적용 여부?
+구현: entity 124 처리 (확인됨), 단위 scaling.
+Gap: 만약 다중 124, 누적 적용 여부 명시 필요.
+제안: 파서 결과에 transforms_applied 배열 기록.
+
+8.2 시작/종료 구분을 igs 형식에서 직접 활용?
+사양: “Igs 파일포맷(형식)의 분석(시작점과 종료점의 구분)”
+현실: 축 반경 슬라이스 비교로 유추. IGES 자체엔 명시적 시작점 메타 없음.
+결정: 문서에 “파일 자체에는 시작/끝 표식이 없으므로 반경 기반 휴리스틱 사용” 명시.
+답변: 현실 안으로 진행
+
+9. 성능 / 안정성
+9.1 대용량 포인트
+사양: 점 개수 가변. 연산 복잡도 명시 없음.
+구현: 분할 청크 최근접 검색, spline 감소 샘플링.
+Gap: NURBS fitting 점수(오차) 및 fallback 선택 로직 미보고.
+제안: fitting residual/elapsed time 로그 추가.
+답변: 나중에 보완 예정.
+
+10. 단위 및 스케일
+10.1 단위 mm
+사양: mm 기본.
+구현: mm 유지.
+Gap: 결과 보고서/Excel에 단위 명시 (열 헤더 suffix) 필요.
+제안: 헤더 “Radius_mm”, “Pitch_mm” 등으로 표준화 혹은 README에 명시.
+답변: 제안대로 진행.
+
+11. 추가 결정 필요(제안)
+A) Default STD_MODE: local vs raw_preserve? (현재 local)
+B) Arc plane default: local_xy vs best_fit? (현재 local_xy)
+C) Min_pitch 필터링 적용 여부(노이즈 억제)
+D) Add second sheet for standardized 1000-point path?
+E) Provide outlier_flag column?
+F) Provide per-point curvature & optional curvature-based smoothing?
+G) Maintain both wrapped and unwrapped θ columns explicitly (θ_wrapped_deg / θ_unwrapped_deg) for clarity.	
+
+
+
+다음 추가 결정/설명 필요 항목의 답변으로 프로그램을 수정변경해 줘.
+
+곡률 기반 보정 규칙: 곡률 계산 방식(반경 변화율 vs 방향각 변화), 임계치(z-score 또는 상위 p%), 적용 구간(window) 정의.
+답변: 필요 항목에 대해서 상세한 설명해 줘
+ 
+Opposite phase(π) 선정 시 “반지름 동일” 정량화: 허용 반경 차 (예: |r_start - r_opp| < tol_mm) 기준과 재귀 반복 횟수.
+답변: 필요 항목에 대해서 상세한 설명해 줘
+
+표준 시트 V열 원래 수식 구조: W가 V를 참조한다는 사양의 정확한 예시(스크린샷 또는 식).
+답변: 다음 셀 공식을 적용
+V2: =IFERROR(MATCH(N2-1,N:N,1),0)  W2: =IF(V2=0,0,U2-@INDEX(U:U,V2))
+V3: =IFERROR(MATCH(N3-1,N:N,1),0)  W3: =IF(V3=0,0,U3-@INDEX(U:U,V3))
+V4: =IFERROR(MATCH(N4-1,N:N,1),0)  W4: =IF(V4=0,0,U4-@INDEX(U:U,V4))
+...
+V1001: =IFERROR(MATCH(N1001-1,N:N,1),0)  W1001: =IF(V1001=0,0,U1001-@INDEX(U:U,V1001))
+ 
+Z3:AC14 각 셀 공식: 높이/권수/평균·최소 피치 외 추가 지표(지름 최소·최대, 신뢰도 등)와 평활/트리밍 여부.
+답변: 나중에 보완예정.
+
+Vectorial Diameter 최종 정의: 단순 2R vs 3D 기울기 교정(축 방향 투영 반경) 선택 및 residual 신뢰도 임계.
+답변: 다음 셀 공식을 적용
+R2: =IF(Q2=0,MAX(Q:Q),Q2)  S2: =IF(P2=0,0,SQRT((B2-@INDEX(B:B,P2))^2+(C2-@INDEX(C:C,P2))^2+(D2-@INDEX(D:D,P2))^2))
+R3: =IF(Q3=0,MAX(Q:Q),Q3)  S3: =IF(P3=0,0,SQRT((B3-@INDEX(B:B,P3))^2+(C3-@INDEX(C:C,P3))^2+(D3-@INDEX(D:D,P3))^2))
+R4: =IF(Q4=0,MAX(Q:Q),Q4)  S4: =IF(P4=0,0,SQRT((B4-@INDEX(B:B,P4))^2+(C4-@INDEX(C:C,P4))^2+(D4-@INDEX(D:D,P4))^2))
+...
+R1001: =IF(Q1001=0,MAX(Q:Q),Q1001)  S1001: =IF(P1001=0,0,SQRT((B1001-@INDEX(B:B,P1001))^2+(C1001-@INDEX(C:C,P1001))^2+(D1001-@INDEX(D:D,P1001))^2))    
+
+Pitch_arc 부분 적용 정책: 어떤 인덱스에서 arc 기반 피치로 대체할지 (신뢰도 residual < threshold).
+답변: 필요 항목에 대해서 상세한 설명해 줘
+
+단위 표기 전략: 열 헤더에 직접 _mm 접미어 추가 vs README 표로 명시 중 선택.
+답변: README 표로 명시.
+
+회전 방향(θ 양(+) 증가) 표준화 문구: 시계/반시계 선택 필요 여부 및 환경변수 추가(SPRING_THETA_DIRECTION?).
+답변: 0도 기준으로 원시데이터가 있는 쪽으로 회전방향.
+
+다중 Transform(124) 누적 적용 여부: 현재 단일 transform만 처리 → 복수 transform 체인 시 처리 전략.
+답변: 현재 단일 transform만 처리.
+
+Outlier 교정 상세 보고: 보고서에 교정된 포인트 개수/인덱스 범위/보간 방식 요약 추가 여부.
+답변: 하단에 간단하게 요약추가.
+
+
+답변: 다음 셀 공식을 적용
+O2: =H2
+O3: =H3
+O4: =H4
+...
+O1001: =H1001
+
+답변: 다음 셀 공식을 적용
+P2: =IFERROR(MATCH(N2-0.5,N:N,1),0)  Q2: =IF(P2=0,0,O2+@INDEX(O:O,P2))
+P3: =IFERROR(MATCH(N3-0.5,N:N,1),0)  Q3: =IF(P3=0,0,O3+@INDEX(O:O,P3))
+P4: =IFERROR(MATCH(N4-0.5,N:N,1),0)  Q4: =IF(P4=0,0,O4+@INDEX(O:O,P4))
+...
+P1001: =IFERROR(MATCH(N1001-0.5,N:N,1),0)  Q1001: =IF(P1001=0,0,O1001+@INDEX(O:O,P1001))
+
+
+답변: 다음 셀 공식을 적용
+L2: 0                  M2: =IF(L2>0,M1+L2,M1+L1)    N2: =M2/360
+L3: =I3-I2             M3: =IF(L3>0,M2+L3,M2+L2)    N3: =M3/360
+L4: =I4-I3             M4: =IF(L4>0,M3+L4,M3+L3)    N4: =M4/360
+...
+L1001: =I1001-I1000    M1001: =IF(L1001>0,M1000+L1001,M1000+L1000) N1001: =M1001/360
+
+
+답변: 다음 셀 공식을 적용
+V2: =IFERROR(MATCH(N2-1,N:N,1),0)  W2: =IF(V2=0,0,U2-@INDEX(U:U,V2))
+V3: =IFERROR(MATCH(N3-1,N:N,1),0)  W3: =IF(V3=0,0,U3-@INDEX(U:U,V3))
+V4: =IFERROR(MATCH(N4-1,N:N,1),0)  W4: =IF(V4=0,0,U4-@INDEX(U:U,V4))
+...
+V1001: =IFERROR(MATCH(N1001-1,N:N,1),0)  W1001: =IF(V1001=0,0,U1001-@INDEX(U:U,V1001))
+
+
+답변: 다음 셀 공식을 적용
+T2: =IF(S2=0,MAX(S:S),S2)          U2: =J2
+T3: =IF(S3=0,MAX(S:S),S3)          U3: =J3
+T4: =IF(S4=0,MAX(S:S),S4)          U4: =J4
+...
+T1001: =IF(S1001=0,MAX(S:S),S1001) U1001: =J1001
+
+modify the program just to convert 
+the rectangular coordinate data(x_norm,y_norm,z_norm) to 
+cylindrical coordinate data(R,θ,Z) according to the cylindar pattern.
+
+Analysis and identify the cause why
+the rectangular coordinate data(x_norm,y_norm,z_norm) do not take cylindar pattern.
+
+Analysis and identify the cause why
+x data does not increase monotonically in the rectangular coordinate data(x,y,z)
+ from IGES data are not similiar with cylindar pattern.
+contains measurement noise or imperfections 
+
+modify the program 
+by refering to the rectangular coordinate data(x,y,z)
+in std sheet.
+The program should take the origin position to make its  similiar pattern.  
+
+cylindrical coordinate data(R,θ,Z) according to the cylindar pattern.
+
+F:/SpringPitch/.venv/Scripts/python.exe f:/SpringPitch/detailed_center_analysis.py
+F:/SpringPitch/.venv/Scripts/python.exe f:/SpringPitch/detailed_center_analysis.py
+correct the problems in the program.
+
+F:/SpringPitch/.venv/Scripts/python.exe  export_xyz_and_plot.py
+
+Make analyze and summarize the overall process how to convert the following steps.
+if possible, modify step1 shows all the points from orginal igs file.
+(3141 points will be made in this case)
+and, step2 should handle all the other following process including point data normalizing 
+for cylindrical coordinate converting. 
+
+(x_norm,y_norm,z_norm) from step2  should be normalized to 1,000 points with equidistance between points keeping along with the original igs points.  but, the original geometrical formation should not be changed.
+step1. (x,y,z)	
+step2. (x_norm,y_norm,z_norm)	
+step3. (R,θ,Z)
+
+
+
+
+
+when converting to cylindrical coordinate, theta from the origin point should start with 0. 
+what do you think that?
+
+
+when running f:/SpringPitch/detailed_center_analysis.py,
+create a new report chart image(new_result_report.png) with a format of attached image. 
+Report and chart details like axis,data can be found in column Z:AT area in std sheet.
+
+
+Windows .exe 생성 방법:
+Windows PC에 Python과 PyInstaller를 설치합니다 (pip install pyinstaller).
+
+프로젝트 파일을 Windows로 복사합니다 (예: Git clone 또는 ZIP 다운로드).
+Windows 명령 프롬프트에서 pyinstaller --onefile run_single_no.py를 실행합니다.
+dist/run_single_no.exe 파일이 생성됩니다.
+주의: tariff_calculator.py는 클래스 기반 라이브러리이므로 직접 .exe로 만들 수 없습니다. 
+run_single_no.py가 엔트리 포인트로, TariffCalculator를 호출합니다.
+
+When running SpringCalculator.exe program,
+the output file TK1.xlsx was not written with the below error message.
+
+다음사항은 우선 프로그램을 분석해서 프로그램이 어떻게 구성되고 동작하는지만 설명 해줘.
+(프로그램 수정변경하지 마시오.) 
+
+1. 스프링 반경이 작은 곳에 원점이 있어야 하는데, 반대 방향에 있는 것 같습니다. 
+(스프링 반경기준으로 시작점/종료점 설정 방법)
+2. PCA축 생성시 현재의 x와 z축을 바꾸면 원통좌표계 r/theta/z값 생성시 z=z으로 생성이 가능한가?
+3. 원점을 설정할 때 3개의 점을 어떻게 선정하고, 원점은 어떻게 선정, z축은 어떻게 생성하셨는지 설명하시오.
+
+ 
+
+
+2025-11-13 18:41:15,415 - INFO -  - Successfully wrote to F:\test\TK1.xlsx
+2025-11-13 18:41:18,947 - INFO - Successfully wrote to root TK1.xlsx
+2025-11-13 18:41:18,948 - WARNING - Error writing root TK1.xlsx: 'F:\\test\\TK1.xlsx' and 'F:\\test\\TK1.xlsx' are the same file. Using output folder version only.
+2025-11-13 18:41:18,948 - INFO -
+
+* 현재 프로그램버전으로
+  windows에서 독립적 형태로 실행되는 
+  SpringCalculator.exe 응용프로그램으로 생성해 주세요.
+  최근 맨마지막에 생성했던 동일한 방식으로 생성하면 될 것 같습니다.
+
+* 현재 프로그램버전으로
+  windows에서 독립적 형태로 실행되는 
+  SpringCalculator.exe 응용프로그램으로 생성해 주세요.
+ - 응용프로그램은 실행환경 및 폴더위치에 상관없이 실행되어야 하고
+   (따라서, 필요시 소스뿐만 아니라 실행에 필요한 라이브러리/모듈 등 포함되어야 함)
+   산출물시트의 포맷을 변경하지 않고 3행이후에 실행결과 데이타만 추가하는 형식으로 실행되어야 한다.	
+ - 응용프로그램 생성위치:   F:/SpringPitch/
+ - 응용프로그램 실행폴더위치에 상관없이 
+   실행폴더위치에 
+   입력파일 *.igs(예: TK1_FRT_zero-1_251014.igs)을 사용하여 
+   출력파일 TK1.xlsx의 zero-1시트 결과데이터  생성하고,
+   출력챠트 spring_detailed_analysis.png 생성한다.
+   
+- SpringCalculator.exe 응용프로그램 실행시
+  동일폴더에 위치한 기존 TK1.xlsx의 zero-1시트양식에 결과데이터만 생성해야 되고,
+  새로 엑셀파일이나 시트를 생성하면 안되도록 수정해줘.
+
+
+* 프로젝트에 대한 
+다음 목차항목외에 필요한 항목들을 추가하여 
+산출물(MS-WORD양식) 2개를 작성한다.
+
+1. 프로그램 설치 방법
+  - 개발환경 설치 및 설정
+  - 필요 라이브러리/모듈 설정
+  - 프로그램 구성요소,실행방법 등
+  
+2. 사용자 메뉴얼(SpringCalculator.exe)
+  - 응용프로그램 생성방법
+  - 응용프로그램 실행방법  

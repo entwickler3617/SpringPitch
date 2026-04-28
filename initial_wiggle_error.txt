@@ -1,0 +1,24 @@
+
+The initial wiggle persists because of path ordering at the coil start, 
+not because the IGES points are wrong. Here’s what’s going on and what I changed:
+
+Why the wiggle happens
+- Projection-only ordering: Sorting raw points by projection onto the PCA axis can locally misorder points where turns are close or the end geometry has small hooks/overlaps. 
+That creates back-and-forth jumps when you align raw→standardized rows at the very beginning.
+- 3D nearest neighbor: KDTree in 3D exacerbates this near adjacent turns—raw points from a neighboring turn are spatially closer than the correct next point along the path.
+- Axial-only nearest: Using just 1D projection still suffers when the curve doubles back in projection near the ends.
+
+What I changed to fix ordering and mapping
+- Helical ordering: I now order the path by unwrapped helical angle in the local YZ plane, aligned with the   principal axis. 
+This yields a clean, monotonic path parameter that respects the coil’s turns from the very first samples.
+- Arc-length mapping: Each standardized row is mapped to raw by cumulative arc-length along that ordered path, avoiding cross-turn mismatches.
+
+What to validate
+- In `raw` sheet, the 3141 rows plot smoothly.
+- In `zero-1`:
+  - E:G `(x_norm,y_norm,z_norm)` forms a smooth, uniformly spaced trajectory from the start.
+  - B:D (mapped raw for each standardized row) no longer shows the wiggly startup.
+
+If you still see wiggling
+- It may be purely from the mapped B:D columns (traceback reference), not Step2/3. If you want, I can remove B:D from `zero-1` entirely and keep Step1 strictly in the `raw` sheet, which eliminates any visual confusion in that sheet.
+- Alternatively, I can add a local-window segment matching (compare short arc segments instead of single points) for even stricter alignment at the first few rows.
